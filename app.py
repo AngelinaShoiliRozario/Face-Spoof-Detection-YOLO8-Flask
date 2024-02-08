@@ -6,7 +6,11 @@ import math
 import time
 import cvzone
 import threading
+import  mediapipe as mp
+import numpy as np
 from ultralytics import YOLO
+import queue
+
 
 app = Flask(__name__)
 print(cv2.__version__)
@@ -16,6 +20,10 @@ socketio = SocketIO(app)
 cap = cv2.VideoCapture(1)
 model = YOLO("./models/best.pt")
 
+cap.set(3, 640)
+cap.set(4, 480)
+
+result_queue = queue.Queue() # Create a queue for communication between threads
 
 # cap.set(3, 640)
 # cap.set(4, 480)
@@ -56,9 +64,117 @@ model = YOLO("./models/best.pt")
 #                 # if conf > confidence:
 #                     # print('class ', cls)
 
-# Define a function to perform prediction
-def perform_prediction(cap, model, confidence):
-    while True:
+def pose_detection(required_pose): 
+    print('in pose detection function')
+    mp_face_mesh = mp.solutions.face_mesh
+    face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.5,min_tracking_confidence=0.5)
+    mp_drawing = mp.solutions.drawing_utils
+    # drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
+    while cap.isOpened():
+        # print('in pose detection function 2')
+        success, image = cap.read()
+        # start = time.time()
+        image= cv2.cvtColor(cv2.flip(image,1 ), cv2.COLOR_BGR2RGB)  # convert to grayscale
+        image.flags.writeable = False
+
+        results = face_mesh.process(image)
+
+        # image.flags.writeable = True
+        # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+        img_h, img_w, img_c = image.shape
+
+        face_3d = []
+        face_2d = []
+
+        if results.multi_face_landmarks:
+            for face_landmarks in results.multi_face_landmarks:
+                for idx, lm in enumerate(face_landmarks.landmark):
+                    # print(idx)
+                    if idx == 33 or idx == 263 or idx == 1 or idx == 61 or idx == 291 or idx == 199:
+                        if idx == 1:
+                            nose_2d = (lm.x + (img_w/2), lm.y * img_h)
+                            node_3d = (lm.x + img_w, lm.y * img_h, lm.z * 3000)
+
+                        x,y = int(lm.x * img_w), int(lm.y * img_h)
+
+                        face_2d.append([x,y])
+
+                        face_3d.append([x,y,lm.z])
+
+                face_2d = np.array(face_2d, dtype=np.float64)
+                face_3d = np.array(face_3d, dtype=np.float64)
+
+                focal_length = 1 * img_w
+
+                cam_matrix = np.array([ [focal_length, 0, img_h / 2],
+                    [0, focal_length, img_w/2],
+                    [0,0,1]
+                ])
+
+                dist_matrix = np.zeros((4,1), dtype=np.float64)
+
+                success, rot_vec, trans_vec = cv2.solvePnP(face_3d, face_2d, cam_matrix, dist_matrix)
+
+                rmat, jac = cv2.Rodrigues(rot_vec)
+
+                angles, mtxR, mtxQ, Qx, Qy, Qz = cv2.RQDecomp3x3(rmat)
+
+                x = angles[0] * 360
+                y = angles[1] * 360
+                z = angles[2] * 360
+
+                if y < -10:
+                    text = 'left'
+                elif y > 10:
+                    text = 'right'
+                elif x < -10:
+                    text = 'down'
+                elif x > 10:
+                    text = 'up'
+                else:
+                    text = 'forward'
+                # print(text)
+                if(required_pose == text):
+                    print(f'in function detected pose {text}')
+                    return True
+
+                # node_3d_projection, jacobian = cv2.projectPoints(node_3d, rot_vec, trans_vec, cam_matrix, dist_matrix)
+
+                # p1 = ( int(nose_2d[0]), int(nose_2d[1]) )
+                # p2 = ( int(nose_2d[0] + y * 10), int(nose_2d[1] - x * 10))
+
+
+
+            # end = time.time()
+            # totalTime = end - start
+            # fps = 1/totalTime
+            # print("FPS ", fps)
+
+            
+
+            # mp_drawing.draw_landmarks(
+            #     image = image,
+            #     landmark_list= face_landmarks,
+            #     landmark_drawing_spec= drawing_spec,
+            #     connection_drawing_spec= drawing_spec
+
+            # )
+        # cv2.imshow('HeadPose', image)
+        # if cv2.waitKey(5) & 0xFF == 27:
+        #     break;
+    cap.release()
+
+
+
+
+# Define a function to perform prediction ..........returns true for normal and false for spoof
+def perform_prediction(cap, model, confidence, room):
+    countFrame = 20
+    spoof_score = 0
+    normal_score = 0
+    while countFrame > 0:
+        countFrame -= 1
         success, img = cap.read()
         results = model(img, stream=True, verbose=False)
         for r in results:
@@ -71,20 +187,26 @@ def perform_prediction(cap, model, confidence):
                 w, h = x2 - x1, y2 - y1
                 # Confidence
                 conf = math.ceil((box.conf[0] * 100)) / 100
-                print('confidence ',conf)
+                # print('confidence ',conf)
                 # Class Name
                 cls = int(box.cls[0])
-                print('class ',cls)
+                if(cls == 0):
+                    normal_score+=1
+                if(cls == 1):
+                    spoof_score+-1
+                
+                # print('class ',cls)
         # time.sleep(0.1)  # Adjust the delay as needed
+    if(normal_score > spoof_score):
+        socketio.emit('spoof_response', 'normal', room=room)
+    else:
+        socketio.emit('spoof_response', 'spoof', room=room)
 
 def detect_spoof():
-    confidence = 0.9
-    cap.set(3, 640)
-    cap.set(4, 480)
+   
 
-    prediction_thread = threading.Thread(target=perform_prediction, args=(cap, model, confidence))
-    prediction_thread.daemon = True
-    prediction_thread.start()
+   
+
 
     while True:
         success, img = cap.read()
@@ -93,6 +215,7 @@ def detect_spoof():
 
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
 
 # on connection make a room 
 @socketio.on('connect')
@@ -112,6 +235,23 @@ def handle_message(data):
     print('message received by the server. MSG: ', data)
     message = f'Hello Client {session["room"]}!'
     socketio.emit('response', message, room=session['room'])
+
+@socketio.on('pose_check')
+def handle_pose_check(data):
+    print('need to check for pose. Required Pose: ', data)
+    detected_pose = pose_detection(data)
+    print(detected_pose)
+    socketio.emit('POSE_response', detected_pose, room=session['room'])
+
+@socketio.on('spoof_check')
+def handle_spoof_check(data):
+    print('need to check for spoof.')
+    confidence = 0.9
+    room=session['room']
+    print(room)
+    prediction_thread = threading.Thread(target=perform_prediction, args=(cap, model, confidence, room))
+    prediction_thread.daemon = True
+    prediction_thread.start()
 
 @app.route('/')
 def index():
