@@ -17,11 +17,7 @@ print(cv2.__version__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
 
-cap = cv2.VideoCapture(1)
 model = YOLO("./models/best.pt")
-
-cap.set(3, 640)
-cap.set(4, 480)
 
 result_queue = queue.Queue() # Create a queue for communication between threads
 
@@ -255,6 +251,10 @@ def handle_spoof_check(data):
 
 @app.route('/')
 def index():
+    cap = cv2.VideoCapture(1)
+    cap.set(3, 640)
+    cap.set(4, 480)
+
     return render_template('index.html')
 
 
