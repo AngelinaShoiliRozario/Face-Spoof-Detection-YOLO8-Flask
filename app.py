@@ -18,6 +18,10 @@ app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
 
 model = YOLO("./models/best.pt")
+cap = cv2.VideoCapture(1)
+
+cap.set(3, 640)
+cap.set(4, 480)
 
 result_queue = queue.Queue() # Create a queue for communication between threads
 
@@ -198,7 +202,7 @@ def perform_prediction(cap, model, confidence, room):
     else:
         socketio.emit('spoof_response', 'spoof', room=room)
 
-def detect_spoof(cap):
+def detect_spoof():
    
 
    
@@ -251,19 +255,12 @@ def handle_spoof_check(data):
 
 @app.route('/')
 def index():
-    
-
-    
-
     return render_template('index.html')
 
 
 @app.route('/video')
 def video():
-    cap = cv2.VideoCapture(0)
-    cap.set(3, 640)
-    cap.set(4, 480)
-    return Response(detect_spoof(cap), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(detect_spoof(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 
