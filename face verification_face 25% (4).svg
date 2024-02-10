@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 300 300">
+
+
+<defs>
+
+<style>.cls-1{isolation:isolate;}.cls-2,.cls-4{fill:none;stroke-miterlimit:10;}.cls-2{stroke:#39b54a;}.cls-3{fill:#e6f4ff;mix-blend-mode:multiply;}.cls-4{stroke-linecap:round;stroke-width:11px;stroke:url(#linear-gradient);}</style>
+
+<linearGradient id="linear-gradient" x1="-622" y1="79.75" x2="-470.5" y2="79.75" gradientTransform="matrix(-1, 0, 0, 1, -326, 0)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6dc497"/><stop offset="0.05" stop-color="#66c399"/><stop offset="0.49" stop-color="#30bbab"/><stop offset="0.82" stop-color="#0fb7b6"/><stop offset="1" stop-color="#02b5ba"/></linearGradient>
+
+</defs>
+
+
+<title>face verification</title>
+
+
+<g class="cls-1"><g id="Layer_1" data-name="Layer 1"><polyline class="cls-2" points="68.71 85.76 68.71 73.96 80.25 73.96"/><polyline class="cls-2" points="230.94 85.76 230.94 73.96 219.41 73.96"/><polyline class="cls-2" points="68.74 219.77 68.69 231.58 80.22 231.63"/><polyline class="cls-2" points="230.97 220.51 230.91 232.31 219.38 232.26"/><path class="cls-3" d="M150,.5A149.39,149.39,0,0,0,32.85,57.13l-.78,1q-2.66,3.4-5.11,7l-1,1.4A149.51,149.51,0,1,0,150,.5Zm0,284.66a135.11,135.11,0,0,1-107.55-217l.48-.62a136.61,136.61,0,0,1,26-25.65A135.16,135.16,0,1,1,150,285.16Z"/><path class="cls-4" d="M290.5,150A140.49,140.49,0,0,0,150,9.5"/></g></g></svg>
