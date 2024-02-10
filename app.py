@@ -198,7 +198,7 @@ def perform_prediction(cap, model, confidence, room):
     else:
         socketio.emit('spoof_response', 'spoof', room=room)
 
-def detect_spoof():
+def detect_spoof(cap):
    
 
    
@@ -251,16 +251,19 @@ def handle_spoof_check(data):
 
 @app.route('/')
 def index():
-    cap = cv2.VideoCapture(1)
-    cap.set(3, 640)
-    cap.set(4, 480)
+    
+
+    
 
     return render_template('index.html')
 
 
 @app.route('/video')
 def video():
-    return Response(detect_spoof(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    cap = cv2.VideoCapture(1)
+    cap.set(3, 640)
+    cap.set(4, 480)
+    return Response(detect_spoof(cap), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 
