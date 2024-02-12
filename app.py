@@ -253,6 +253,11 @@ def handle_spoof_check(data):
     prediction_thread.daemon = True
     prediction_thread.start()
 
+@socketio.on('stream')
+def handle_stream(data):
+    image_data = data['image']
+    print(image_data)
+
 @app.route('/')
 def index():
     return render_template('index.html')
