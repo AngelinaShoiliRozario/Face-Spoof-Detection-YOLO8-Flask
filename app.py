@@ -10,6 +10,13 @@ import  mediapipe as mp
 import numpy as np
 from ultralytics import YOLO
 import queue
+import os
+import base64
+import io
+from io import StringIO
+from PIL import Image
+import imutils
+
 
 
 app = Flask(__name__)
@@ -169,13 +176,12 @@ def pose_detection(required_pose):
 
 
 # Define a function to perform prediction ..........returns true for normal and false for spoof
-def perform_prediction(cap, model, confidence, room):
+def perform_prediction(img, confidence, room):
     countFrame = 20
     spoof_score = 0
     normal_score = 0
     while countFrame > 0:
         countFrame -= 1
-        success, img = cap.read()
         results = model(img, stream=True, verbose=False)
         for r in results:
             boxes = r.boxes
@@ -191,16 +197,20 @@ def perform_prediction(cap, model, confidence, room):
                 # Class Name
                 cls = int(box.cls[0])
                 if(cls == 0):
+                    return 'normal'
                     normal_score+=1
                 if(cls == 1):
+                    return 'spoof'
+
                     spoof_score+-1
+                
                 
                 # print('class ',cls)
         # time.sleep(0.1)  # Adjust the delay as needed
-    if(normal_score > spoof_score):
-        socketio.emit('spoof_response', 'normal', room=room)
-    else:
-        socketio.emit('spoof_response', 'spoof', room=room)
+    # if(normal_score > spoof_score):
+    #     socketio.emit('spoof_response', 'normal', room=room)
+    # else:
+    #     socketio.emit('spoof_response', 'spoof', room=room)
 
 def detect_spoof():
    
@@ -253,10 +263,116 @@ def handle_spoof_check(data):
     prediction_thread.daemon = True
     prediction_thread.start()
 
+
+
+# Define a function to perform prediction ..........returns true for normal and false for spoof
+def perform_prediction1(imgs, confidence, room):
+    spoof_score = 0
+    normal_score = 0
+    
+    
+    for i in range(len(imgs)):
+        
+        OUTPUT_FOLDER = 'output'
+        output_path = os.path.join(OUTPUT_FOLDER, f'{i}.jpg')
+        imgs[i].save(output_path)
+        
+        results = model(imgs[i], stream=True, verbose=False)
+        for r in results:
+            boxes = r.boxes
+            for box in boxes:
+                x1, y1, x2, y2 = box.xyxy[0]
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                w, h = x2 - x1, y2 - y1
+                conf = math.ceil((box.conf[0] * 100)) / 100
+                cls = int(box.cls[0])
+                if(conf >= confidence):
+                    if(cls == 0):
+                        # return 'normal'
+                        # print('normal')   
+                        normal_score+=1
+                    if(cls == 1):
+                        # return 'spoof'
+                        # print('spoof')
+                        spoof_score+-1
+    
+    if(spoof_score > normal_score):
+        socketio.emit('spoof_response', 'spoof', room=room)
+    else:
+        socketio.emit('spoof_response', 'normal', room=room)
+ 
+            
+
+allResults = []
 @socketio.on('stream')
 def handle_stream(data):
-    image_data = data['image']
-    print(image_data)
+    
+    allImages = []
+    frame_arr = data['image']
+    # count = data['count']
+    for i in range(len(frame_arr)):
+        image_data = base64.b64decode(frame_arr[i].split(',')[1]) # Decode the base64-encoded image data
+        image = Image.open(io.BytesIO(image_data)) # Create a PIL Image object from the decoded image data
+        allImages.append(image)
+
+    print('need to check for spoof.')
+    confidence = 0.85
+    room=session['room']
+    # print(room)
+    # result = perform_prediction(image, confidence, room)
+    # allResults.append(result)
+    print('all results')
+    print(allImages)
+
+    
+    # if(count == 2):
+    perform_prediction1(allImages, confidence, room)
+        
+    
+    # prediction_thread = threading.Thread(target=, args=(image, confidence, room))
+    # prediction_thread.daemon = True
+    # prediction_thread.start()
+
+    # # Save the image to the backend
+    # OUTPUT_FOLDER = 'output'
+    # output_path = os.path.join(OUTPUT_FOLDER, f'{count}.jpg')
+    # image.save(output_path)
+
+   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 @app.route('/')
 def index():
@@ -270,4 +386,4 @@ def video():
 
 
 if __name__ == "__main__":
-    socketio.run(app, host='0.0.0.0')
+    socketio.run(app, host='0.0.0.0',debug=True, ssl_context="adhoc")

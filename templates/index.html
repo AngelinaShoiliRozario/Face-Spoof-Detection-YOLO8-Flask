@@ -271,12 +271,12 @@
 
                 <div class="circular-container"
                     style="position: relative;width: 85%;border-radius: 50%;margin-left: auto;margin-right: auto;overflow: hidden;">
-                                      <video id="videoElement" autoplay playsinline
-                                              style="position: absolute;width: 150%;left:50%;z-index: 0;transform: translateX(-50%);"></video>
+                    <video id="videoElement" autoplay playsinline
+                        style="position: absolute;width: 150%;left:50%;z-index: 0;transform: translateX(-50%);"></video>
                     <!-- <img src="{{ url_for('video') }}" id="videoElement"
                         style="position: absolute;width: 150%;left:50%;z-index: 0;transform: translateX(-50%);" /> -->
 
-                  
+
 
                 </div>
                 <br>
@@ -296,12 +296,15 @@
                     </div>
                 </div>
                 <br>
-<div class="d-flex">
-    <div class="flex-grow-1 invisible percent-3" style="height: 10px; background-color: #02B5BA;"></div>
-    <div class="flex-grow-1 invisible percent-2" style="height: 10px; background-color: #02B5BA; margin-left: 10px;"></div>
-    <div class="flex-grow-1 invisible percent-1" style="height: 10px; background-color: #02B5BA; margin-left: 10px;"></div>
-    <div class="flex-grow-1 invisible percent-0" style="height: 10px; background-color: #02B5BA; margin-left: 10px;"></div>
-</div>
+                <div class="d-flex">
+                    <div class="flex-grow-1 invisible percent-3" style="height: 10px; background-color: #02B5BA;"></div>
+                    <div class="flex-grow-1 invisible percent-2"
+                        style="height: 10px; background-color: #02B5BA; margin-left: 10px;"></div>
+                    <div class="flex-grow-1 invisible percent-1"
+                        style="height: 10px; background-color: #02B5BA; margin-left: 10px;"></div>
+                    <div class="flex-grow-1 invisible percent-0"
+                        style="height: 10px; background-color: #02B5BA; margin-left: 10px;"></div>
+                </div>
                 <div class="texts d-none scanning-text mt-3">
                     <h1>Scanning Your Face</h1>
                     <p id="pose-indecating-msg">Please Turn Your Head Right</p>
@@ -310,7 +313,10 @@
                     <img src="{{ url_for('static', filename='pose/head-right.png') }}" alt="" height="110"
                         id="pose-indecating-img">
                 </div>
-
+                <div id="container">
+                    <canvas id="canvasOutput"></canvas>
+                    <video autoplay="true" id="videoElement"></video>
+                </div>
             </div>
             <script>
                 document.addEventListener("DOMContentLoaded", () => {
@@ -332,12 +338,12 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
         crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/opencv@7.0.0/lib/opencv.min.js"></script>
+    <script src="https://docs.opencv.org/4.5.0/opencv.js"></script>
     <script>
         let poseArr = ['forward', 'up', 'left', 'right'];
         let imageArr = ['pose/head-up.png', 'pose/head-left.png', 'pose/head-right.png'];
 
-        let socket = io.connect('http://127.0.0.1:5000/');
+        let socket = io.connect();
 
         socket.on('connect', function () {
             console.log('Connected');
@@ -423,27 +429,18 @@
             socket.emit('spoof_check', 'Required');
             emitPose(poseArr[ccc - 1]);
         }
+        // videoElement.width = width= 640; 
+        // videoElement.height =height= 480; ;
+        
 
         document.addEventListener('DOMContentLoaded', function () {
             const videoElement = document.getElementById('videoElement');
-            // videoElement.width = 640; 
-            // videoElement.height = 480; ;
-            try{
+            try {
                 if (navigator.mediaDevices.getUserMedia) {
                     navigator.mediaDevices.getUserMedia({ video: true })
                         .then(function (stream) {
                             videoElement.srcObject = stream;
-                            videoElement.play();
-                             // Emit each frame to the server
-                            const canvas = document.createElement('canvas');
-                            const context = canvas.getContext('2d');
-                            setInterval(() => {
-                                canvas.width = videoElement.videoWidth;
-                                canvas.height = videoElement.videoHeight;
-                                context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-                                const imageData = canvas.toDataURL('image/jpeg');
-                                socket.emit('stream', { image: imageData });
-                            }, 100); // Adjust the interval as needed
+                            videoElement.play();                           
                         })
                         .catch(function (error) {
                             console.error('Error accessing media devices: ', error);
@@ -451,8 +448,36 @@
                 } else {
                     alert('getUserMedia is not supported in this browser.');
                 }
-              
-            } catch(e){
+                let frameCount = 3;
+                let frameArray = [];
+                let count = 0;
+                videoElement.addEventListener('loadedmetadata', function() {
+                    console.log('video metadata loaded');
+                    function processFrame() {
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.width = videoElement.videoWidth;
+                        canvas.height = videoElement.videoHeight;
+                        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                        const frameData = canvas.toDataURL('image/jpeg');
+                        frameArray.push(frameData);
+                        // socket.emit('stream', { image: frameData, count: count });
+                        
+                    }
+                    setInterval(()=>{
+                        if(count < frameCount) {
+                            processFrame();
+                        }
+                        if(frameCount == count) {
+                            socket.emit('stream', { image: frameArray });
+                            clearInterval();
+                        }
+                        count++;
+
+                    }, 1000)
+                });
+            } catch (e) {
                 console.log(e.message);
             }
         });
