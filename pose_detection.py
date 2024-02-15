@@ -10,10 +10,11 @@ mp_drawing = mp.solutions.drawing_utils
 
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 
 while cap.isOpened():
-    success, image = cap.read()
+    # success, image = cap.read()
+    image = cv2.imread('./left.jpg')
     start = time.time()
 
     image= cv2.cvtColor(cv2.flip(image,1 ), cv2.COLOR_BGR2RGB)

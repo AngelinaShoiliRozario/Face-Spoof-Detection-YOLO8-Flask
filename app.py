@@ -15,7 +15,7 @@ import base64
 import io
 from io import StringIO
 from PIL import Image
-import imutils
+
 
 
 
@@ -197,9 +197,11 @@ def perform_prediction(img, confidence, room):
                 # Class Name
                 cls = int(box.cls[0])
                 if(cls == 0):
+                    print('normal')
                     return 'normal'
                     normal_score+=1
                 if(cls == 1):
+                    print('spoof')
                     return 'spoof'
 
                     spoof_score+-1
@@ -386,4 +388,4 @@ def video():
 
 
 if __name__ == "__main__":
-    socketio.run(app, host='0.0.0.0',debug=True, ssl_context="adhoc")
+    socketio.run(app, host='0.0.0.0',debug=True)
