@@ -273,8 +273,7 @@
                     style="position: relative;width: 85%;border-radius: 50%;margin-left: auto;margin-right: auto;overflow: hidden;">
                     <video id="videoElement" autoplay playsinline
                         style="position: absolute;width: 150%;left:50%;z-index: 0;transform: translateX(-50%);"></video>
-                    <!-- <img src="{{ url_for('video') }}" id="videoElement"
-                        style="position: absolute;width: 150%;left:50%;z-index: 0;transform: translateX(-50%);" /> -->
+
 
 
 
@@ -340,6 +339,7 @@
         crossorigin="anonymous"></script>
     <script src="https://docs.opencv.org/4.5.0/opencv.js"></script>
     <script>
+        let requiredPose = 0;
         let poseArr = ['forward', 'up', 'left', 'right'];
         let imageArr = ['pose/head-up.png', 'pose/head-left.png', 'pose/head-right.png'];
 
@@ -364,6 +364,7 @@
         const emitPose = (txt) => {
 
             if (ccc == 3) {
+                requiredPose = 'left';
                 let progressBar = document.querySelector(`.percent-${ccc}`);
                 progressBar.classList.remove('invisible');
 
@@ -374,6 +375,7 @@
                 pose_indecating_img.src = "{{ url_for('static', filename='pose/head-left.png') }}";
             }
             if (ccc == 2) {
+                requiredPose = 'up';
                 let progressBar = document.querySelector(`.percent-${ccc}`);
                 progressBar.classList.remove('invisible');
 
@@ -384,6 +386,7 @@
                 pose_indecating_img.src = "{{ url_for('static', filename='pose/head-up.png') }}";
             }
             if (ccc == 1) {
+                requiredPose = 'forward';
                 let progressBar = document.querySelector(`.percent-${ccc}`);
                 progressBar.classList.remove('invisible');
 
@@ -402,7 +405,7 @@
             ccc--;
         }
 
-        socket.on('POSE_response', function (data) {
+        socket.on('pose_in_response', function (data) {
             console.log('Pose Response received: ' + data);
             if (ccc) {
                 emitPose(poseArr[ccc - 1]);
@@ -415,9 +418,13 @@
                 pose_indecating_msg.innerHTML = '';
                 pose_indecating_msg.innerHTML = 'Congratulations!';
                 pose_indecating_img.src = "{{ url_for('static', filename='pose/head-forward.png') }}";
+                requiredPose = 'completed';
+                clearInterval(intervalId);
+
             }
         });
         const startVerification = (tag) => {
+            requiredPose = 'right';
             tag.classList.add('d-none');
             const spinner_box = document.querySelector('.spinner-box');
             const scanning_text_1 = document.querySelectorAll('.scanning-text');
@@ -426,13 +433,13 @@
                 ele.classList.remove('d-none');
             });
 
-            socket.emit('spoof_check', 'Required');
+
             emitPose(poseArr[ccc - 1]);
         }
         // videoElement.width = width= 640; 
         // videoElement.height =height= 480; ;
-        
 
+let intervalId;
         document.addEventListener('DOMContentLoaded', function () {
             const videoElement = document.getElementById('videoElement');
             try {
@@ -440,7 +447,7 @@
                     navigator.mediaDevices.getUserMedia({ video: true })
                         .then(function (stream) {
                             videoElement.srcObject = stream;
-                            videoElement.play();                           
+                            videoElement.play();
                         })
                         .catch(function (error) {
                             console.error('Error accessing media devices: ', error);
@@ -448,10 +455,11 @@
                 } else {
                     alert('getUserMedia is not supported in this browser.');
                 }
-                let frameCount = 3;
+                let frameCount = 15;
+                let totalFrame = 0;
                 let frameArray = [];
                 let count = 0;
-                videoElement.addEventListener('loadedmetadata', function() {
+                videoElement.addEventListener('loadedmetadata', function () {
                     console.log('video metadata loaded');
                     function processFrame() {
                         const canvas = document.createElement('canvas');
@@ -463,19 +471,24 @@
                         const frameData = canvas.toDataURL('image/jpeg');
                         frameArray.push(frameData);
                         // socket.emit('stream', { image: frameData, count: count });
-                        
                     }
-                    setInterval(()=>{
-                        if(count < frameCount) {
+                    let timeCount = 0;
+                    intervalId = setInterval(() => {
+                        if (count < frameCount) {
                             processFrame();
                         }
-                        if(frameCount == count) {
-                            socket.emit('stream', { image: frameArray });
-                            clearInterval();
+                        if (frameCount == count) {
+                            totalFrame += 15;
+                            console.log(requiredPose)
+                            socket.emit('stream', { image: frameArray, frameCount: totalFrame, requiredPose: requiredPose });
+
+                            frameArray = [];
+                            count = 0;
                         }
                         count++;
+                        timeCount++;
 
-                    }, 1000)
+                    }, 100)
                 });
             } catch (e) {
                 console.log(e.message);

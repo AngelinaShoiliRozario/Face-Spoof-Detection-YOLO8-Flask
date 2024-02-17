@@ -24,52 +24,16 @@ print(cv2.__version__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
 
-model = YOLO("./models/best.pt")
-cap = cv2.VideoCapture(1)
+model = YOLO("./models/best7000.pt")
 
-cap.set(3, 640)
-cap.set(4, 480)
+# Dictionary to store frames for each user
+frames_all = {}
+
+
 
 result_queue = queue.Queue() # Create a queue for communication between threads
 
-# cap.set(3, 640)
-# cap.set(4, 480)
 
-# below 60 spoof should go for manual testing
-# count frame to 30
-
-# def detect_spoof():
-#     confidence = 0.9
-#
-#     # cap = cv2.VideoCapture("../Videos/motorbikes.mp4")  # For Video
-#
-#     classNames = ["real", "fake"]
-#
-#     while True:
-#         success, img = cap.read()
-#         ret, buffer = cv2.imencode('.jpg', img)  # image to buffer
-#         frame = buffer.tobytes()
-#
-#         yield (b'--frame\r\n'
-#                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-#         results = model(img, stream=True,verbose=False)
-#         for r in results:
-#             boxes = r.boxes
-#             for box in boxes:
-#                 # Bounding Box
-#                 x1, y1, x2, y2 = box.xyxy[0]
-#                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-#                 # cv2.rectangle(img,(x1,y1),(x2,y2),(255,0,255),3)
-#                 w, h = x2 - x1, y2 - y1
-#                 # Confidence
-#                 conf = math.ceil((box.conf[0] * 100)) / 100
-#                 print('confidence ',conf)
-#                 # Class Name
-#                 cls = int(box.cls[0])
-#
-#                 print('class ', cls)
-#                 # if conf > confidence:
-#                     # print('class ', cls)
 
 def pose_detection(required_pose): 
     print('in pose detection function')
@@ -215,11 +179,6 @@ def perform_prediction(img, confidence, room):
     #     socketio.emit('spoof_response', 'spoof', room=room)
 
 def detect_spoof():
-   
-
-   
-
-
     while True:
         success, img = cap.read()
         ret, buffer = cv2.imencode('.jpg', img)
@@ -232,8 +191,10 @@ def detect_spoof():
 # on connection make a room 
 @socketio.on('connect')
 def handle_connect():
+    user_id = request.sid
     session['room'] = request.sid
     join_room(session['room'])
+    frames_all[user_id] = []
     print(f"User connected with session ID: {session['room']}")
 
 # on disconnection remove a room 
@@ -288,14 +249,15 @@ def perform_prediction1(imgs, confidence, room):
                 w, h = x2 - x1, y2 - y1
                 conf = math.ceil((box.conf[0] * 100)) / 100
                 cls = int(box.cls[0])
-                if(conf >= confidence):
+                print('class ' , cls)
+                if(conf > confidence):
                     if(cls == 0):
                         # return 'normal'
-                        # print('normal')   
+                        print('normal')   
                         normal_score+=1
                     if(cls == 1):
                         # return 'spoof'
-                        # print('spoof')
+                        print('spoof')
                         spoof_score+-1
     
     if(spoof_score > normal_score):
@@ -305,41 +267,32 @@ def perform_prediction1(imgs, confidence, room):
  
             
 
-allResults = []
+
 @socketio.on('stream')
 def handle_stream(data):
-    
-    allImages = []
+    user_id = request.sid
     frame_arr = data['image']
-    # count = data['count']
-    for i in range(len(frame_arr)):
-        image_data = base64.b64decode(frame_arr[i].split(',')[1]) # Decode the base64-encoded image data
-        image = Image.open(io.BytesIO(image_data)) # Create a PIL Image object from the decoded image data
-        allImages.append(image)
+    frames_all[user_id].extend(frame_arr)
 
-    print('need to check for spoof.')
-    confidence = 0.85
-    room=session['room']
+    # for i in range(len(frame_arr)):
+    #     image_data = base64.b64decode(frame_arr[i].split(',')[1]) # Decode the base64-encoded image data
+    #     image = Image.open(io.BytesIO(image_data)) # Create a PIL Image object from the decoded image data
+    #     allImages.append(image)
+
+    # print('need to check for spoof.')
+    # confidence = 0.85
+    # room=session['room']
     # print(room)
     # result = perform_prediction(image, confidence, room)
     # allResults.append(result)
-    print('all results')
-    print(allImages)
+    # print('all results')
+    # print(allImages)
 
     
-    # if(count == 2):
-    perform_prediction1(allImages, confidence, room)
+    # perform_prediction1(allImages, confidence, room)
         
     
-    # prediction_thread = threading.Thread(target=, args=(image, confidence, room))
-    # prediction_thread.daemon = True
-    # prediction_thread.start()
-
-    # # Save the image to the backend
-    # OUTPUT_FOLDER = 'output'
-    # output_path = os.path.join(OUTPUT_FOLDER, f'{count}.jpg')
-    # image.save(output_path)
-
+ 
    
 
 
@@ -388,4 +341,4 @@ def video():
 
 
 if __name__ == "__main__":
-    socketio.run(app, host='0.0.0.0',debug=True)
+    socketio.run(app, host='0.0.0.0',debug=True, ssl_context="adhoc")
